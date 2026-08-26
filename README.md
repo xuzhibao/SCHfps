@@ -1,23 +1,43 @@
 # SJZU Campus PixelStrike 适配版
 
-本版本以 MIT 开源代码为枪战玩法底座，替换为石家庄学院南校区 v007 贴图地图。
+本版本以 [MineSunshineone/PixelStrike](https://github.com/MineSunshineone/PixelStrike) 的 MIT 开源代码为枪战玩法底座，地图基准已替换为用户提供的 Mineways/Minecraft 石家庄学院精细复刻。
 
 - 保留：第一人称移动、预测/校正、枪械、换弹、后坐力、投掷物、HUD、音效、Go 60Hz 权威服务器。
-- 替换：体素地图改为校园 AABB 碰撞与出生点；客户端贴图改为 v007 高清卫星地面纹理。
-- 坐标：v007 导出器已将校园网格写成 Three.js/PixelStrike 的 Y-up 坐标（`x=east, y=height, z=地图深度`），客户端不再二次旋转 GLB；这与 `map.json` 的 AABB 和卫星图同向。
-- 小操场：仅来自 v007 高清卫星地面纹理，不额外加载程序化操场模型。
+- 基准几何：`client/public/assets/mcmap/campus_mc.obj`，约 91 万顶点、93 万三角面，单位为米，Y 轴向上；没有镜像或二次旋转。
+- 原始材质：`mcmap.mtl` 加 `tex/` 中 200 张 Mineways 纹理。194 个 `map_Kd` 引用已逐一校验，缺失数为 0。
+- 三座补充建筑：行政楼、大学生活动中心和大操场仅从旧 v007 GLB 提取对应网格，其余旧建筑全部不加载。
+- 限定框：三座补充建筑分别缩放到 MC 世界的铁块实线框内，四边均留 2 米安全间距；保持坐标轴方向，不镜像、不旋转 90°/180°。
+- 传输：38 MB OBJ 附带有效的 `campus_mc.obj.gz` 预压缩文件；Nginx 已启用 `gzip_static`。
 
-## 楼梯与可玩碰撞
+## MC 地图碰撞、楼梯与雷达（v004 修复）
 
-上一版把每栋楼简化成一个完整实心 AABB，视觉上有楼梯，但玩家在楼体外无法靠近入口，也无法逐级上行。本版把碰撞拆成三层：
+`map.json` 已从 MC 实际表面重新生成，而不是把最高屋顶向下一直填到地面：
 
-- 建筑只保留后墙、侧墙和必要的高台，不再用整栋实心盒封死首层入口。
-- 图书馆 26 级、活动中心中央 6 级、活动中心左端 22 级、行政楼 2 级，以及大操场主席台中央/两侧共 4 组楼梯写入独立的阶梯 AABB。
-- 大操场中央斜向楼梯增加了加宽的可玩踏步通道；每级碰撞高度差控制在 `StepUp=0.55m` 内，允许 WASD 连续走上去。可视模型不改形，只放宽碰撞容差。
+- 54,131 个 MC 地形/建筑薄壳碰撞盒分别表达平台、楼板和竖墙；屋顶、雨棚不再形成封死门洞或天井的实体柱。
+- 三座补充建筑沿用并变换 93 个碰撞盒，其中 86 个为独立楼梯/台阶碰撞。
+- 总计 54,225 个碰撞盒；客户端和服务端均使用 16 米空间索引，不在每帧遍历整张地图。
+- 8 个出生点除了角色尺寸相交检查，还必须连通到同一室外导航网络；当前开放网络包含 131,062 个 2 米采样格。
+- Minecraft 半砖和楼梯按 1/16 米高度量化；客户端与服务端的 `StepUp=0.55m` 保持一致。
+- 树叶、花草、装饰栏杆和白色铁块建筑范围线只保留视觉，不再阻挡人物和子弹。
+- 小地图使用完整 759×1073 米校园俯视图，以玩家为中心显示 220 米动态窗口、实时 X/Z 坐标和其他存活玩家，不再使用原 PixelStrike 的固定 136 米雷达。
 
-客户端预测和 Go 服务端使用同一组阶梯盒，因此本地脚下位置、服务器权威位置和射线遮挡保持一致。
+完整落位与越界结果见 `MC_CAMPUS_VALIDATION.json`，俯视校验见 `MC_CAMPUS_PLACEMENT_QA.png`。
 
+原项目的 MIT 许可证保留在本目录 `LICENSE`，校园模型属于本项目已有资产。
 
+<p align="center">
+  <a href="https://linux.do/" title="LINUX DO"><img src="https://linux.do/logo-64.svg" width="32" height="32" alt="LINUX DO"></a>
+  <br>
+  <a href="https://linux.do/"><strong>LINUX DO · Where Possible Begins</strong></a>
+</p>
+
+浏览器 3D 战术死斗：单房 100 人、759×1073 米校园地图、Go 权威服务端、Three.js 客户端、WebSocket 二进制协议。
+
+## 一场持续到国庆的共创实验
+
+Pixel Strike 不是一个已经定型的成品，而是一场开放实验：如果每个人都带来一个想法、一张地图、一种武器手感、一次性能优化或一个有趣的 Bug 修复，这个项目最后会变成什么样？
+
+实验从现在持续到 **2026 年国庆（10 月 1 日）**。欢迎通过 Issue、Pull Request、测试反馈或玩法讨论参与。国庆当天我们会回头看看：一个最初由 AI 生成的百人网页 FPS，在大家共同参与之后，究竟长成了什么样子。
 
 ## AI 生成免责声明
 
@@ -33,10 +53,13 @@
 pixel-strike/
 ├── client/                   # Three.js 客户端、HUD、音效与 Nginx
 │   ├── src/                  # 渲染、输入、预测、网络与玩法反馈
+│   ├── public/assets/mcmap/  # Mineways OBJ、MTL、纹理与预压缩 OBJ
 │   └── public/sfx/           # 合成游戏音效
 ├── server/                   # Go 权威服务端、房间、碰撞与持久化
 ├── tools/                    # 地图/音效生成器与百人压测客户端
 ├── map.json                  # 体素地图和出生点
+├── MC_CAMPUS_VALIDATION.json # 三座补充建筑方向、边界与碰撞校验
+├── MC_CAMPUS_PLACEMENT_QA.png# 顶视落位检查图
 ├── docker-compose.yml        # 本地 Docker 编排
 ├── docker-compose.prod.yml   # 生产 Docker 编排
 └── README.md

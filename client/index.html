@@ -546,6 +546,8 @@
     .radar-meta {
       display: flex;
       justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
       border-top: 1px solid var(--line);
       padding: 6px 4px 0;
       color: var(--muted);
@@ -1326,10 +1328,10 @@
   <div id="hud" aria-label="战斗界面">
     <div id="radar-wrap">
       <canvas id="radar" width="256" height="256" aria-label="战术雷达"></canvas>
-      <div class="radar-meta"><span>CITADEL 128M</span><span>在线 <strong id="online-count">0</strong></span></div>
+      <div class="radar-meta"><span>校园雷达 · 220M</span><span id="radar-position">X 0 · Z 0</span><span>在线 <strong id="online-count">0</strong></span></div>
     </div>
 
-    <div id="match-strip"><span>FREE FOR ALL</span><span>黄昏要塞</span><span id="shield-badge">出生保护</span></div>
+    <div id="match-strip"><span>FREE FOR ALL</span><span>石家庄学院校园</span><span id="shield-badge">出生保护</span></div>
     <div id="net-stats" aria-live="polite">
       <span>延迟 <strong id="latency-value">-- ms</strong></span>
       <span>总带宽 <strong id="bandwidth-value">0.0 Mbps</strong></span>

@@ -27,23 +27,6 @@ const WEAPON_BADGES: Record<number, string> = {
   13: 'HE',
 };
 
-const BLOCK_RADAR_COLORS: Record<number, string> = {
-  0: '#385e2b',
-  1: '#5c5e58',
-  2: '#7d5830',
-  3: '#8c949c',
-  4: '#4a4d46',
-  5: '#2d5422',
-  6: '#a89d6e',
-  7: '#6e3028',
-  8: '#d49b28',
-  9: '#181226',
-  10: '#754b28',
-  11: '#7ab3cf',
-  12: '#2a5ebd',
-  13: '#6e4f35',
-};
-
 const WEAPON_SVGS: Record<number, string> = {
   0: `<svg viewBox="0 0 32 32"><rect x="6" y="11" width="16" height="5" fill="#1b1b1e"/><rect x="8" y="16" width="12" height="3" fill="#2c3038"/><rect x="8" y="19" width="5" height="7" fill="#1b1b1e" transform="rotate(20 8 19)"/><circle cx="20" cy="12" r="1.5" fill="#39ff14"/></svg>`,
   1: `<svg viewBox="0 0 32 32"><rect x="5" y="10" width="18" height="6" fill="#d2d6dc"/><rect x="7" y="16" width="14" height="3" fill="#9fa3ab"/><rect x="7" y="19" width="6" height="8" fill="#1b1b1e" transform="rotate(20 7 19)"/><rect x="10" y="21" width="2" height="2" fill="#d4af37"/></svg>`,
@@ -93,6 +76,8 @@ export class Hud {
   private deathCountdown = el('death-countdown');
   private radar = el('radar') as HTMLCanvasElement;
   private radarBase = document.createElement('canvas');
+  private radarPosition = el('radar-position');
+  private radarBounds = { xmin: -68, xmax: 68, zmin: -68, zmax: 68 };
 
   private map: MapData | null = null;
   private lastRadar = 0;
@@ -370,64 +355,102 @@ export class Hud {
 
   setMap(map: MapData) {
     this.map = map;
-    this.radarBase.width = 256;
-    this.radarBase.height = 256;
+    const [xmin, zmin] = map.origin ?? [-map.size[0] / 2, -map.size[1] / 2];
+    this.radarBounds = { xmin, xmax: xmin + map.size[0], zmin, zmax: zmin + map.size[1] };
+    this.radarBase.width = Math.max(256, Math.round(map.size[0]));
+    this.radarBase.height = Math.max(256, Math.round(map.size[1]));
     const ctx = this.radarBase.getContext('2d')!;
-    const ARENA_SPAN = 136; // Focus on active 128m fortress area (-68 to +68)
-    const scale = this.radarBase.width / ARENA_SPAN;
-    const origin = ARENA_SPAN / 2;
-
-    // Dark high-tech tactical radar background
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, this.radarBase.width, this.radarBase.height);
 
-    // Subtle 32m tactical radar grid
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 1;
-    for (let g = 0; g <= ARENA_SPAN; g += 32) {
-      const pos = g * scale;
-      ctx.beginPath();
-      ctx.moveTo(pos, 0); ctx.lineTo(pos, this.radarBase.height);
-      ctx.moveTo(0, pos); ctx.lineTo(this.radarBase.width, pos);
-      ctx.stroke();
-    }
+    const drawLandmarkScopes = () => {
+      const scopes = [
+        [158, 246, -360, -279],
+        [158, 241, -174, 59],
+        [-170, -7, 107, 333],
+      ];
+      const sx = this.radarBase.width / map.size[0];
+      const sz = this.radarBase.height / map.size[1];
+      ctx.fillStyle = 'rgba(224, 228, 220, .18)';
+      ctx.strokeStyle = 'rgba(240, 234, 220, .62)';
+      ctx.lineWidth = 1.5;
+      for (const [x0, x1, z0, z1] of scopes) {
+        const px = (x0 - xmin) * sx;
+        const py = (this.radarBounds.zmax - z1) * sz;
+        const width = (x1 - x0) * sx;
+        const height = (z1 - z0) * sz;
+        ctx.fillRect(px, py, width, height);
+        ctx.strokeRect(px, py, width, height);
+      }
+    };
+    drawLandmarkScopes();
 
-    // Draw active structures and cover (ignore outer 512m floor slab)
-    for (const b of map.blocks) {
-      if (b.t === 0) continue; // Skip giant ground slab to avoid empty padding
-      ctx.fillStyle = BLOCK_RADAR_COLORS[b.t] ?? '#444850';
-      const bx = (b.x + origin) * scale;
-      const bz = (b.z + origin) * scale;
-      ctx.fillRect(bx, bz, Math.max(1.5, b.w * scale), Math.max(1.5, b.d * scale));
-    }
+    const image = new Image();
+    image.onload = () => {
+      ctx.clearRect(0, 0, this.radarBase.width, this.radarBase.height);
+      ctx.drawImage(image, 0, 0, this.radarBase.width, this.radarBase.height);
+      ctx.fillStyle = 'rgba(3, 10, 8, .24)';
+      ctx.fillRect(0, 0, this.radarBase.width, this.radarBase.height);
+      drawLandmarkScopes();
+      this.drawRadar(0, 0, 0, true);
+    };
+    image.src = `${import.meta.env.BASE_URL}assets/mcmap/campus_minimap.png`;
     this.drawRadar(0, 0, 0, true);
   }
 
-  updateRadar(x: number, z: number, yaw: number, now: number) {
+  updateRadar(x: number, z: number, yaw: number, now: number, players: Iterable<PlayerSnap>) {
     if (now - this.lastRadar < 70) return;
     this.lastRadar = now;
-    this.drawRadar(x, z, yaw, false);
+    this.drawRadar(x, z, yaw, false, players);
   }
 
-  private drawRadar(x: number, z: number, yaw: number, staticOnly: boolean) {
+  private drawRadar(x: number, z: number, yaw: number, staticOnly: boolean, players: Iterable<PlayerSnap> = []) {
     if (!this.map || !this.radar) return;
     const c = this.radar;
     const ctx = c.getContext('2d');
     if (!ctx) return;
-    const ARENA_SPAN = 136;
-    const scale = c.width / ARENA_SPAN;
-    const origin = ARENA_SPAN / 2;
-    ctx.drawImage(this.radarBase, 0, 0, c.width, c.height);
+    const viewSpan = 220;
+    const half = viewSpan / 2;
+    const bounds = this.radarBounds;
+    const centerX = Math.max(bounds.xmin + half, Math.min(bounds.xmax - half, x));
+    const centerZ = Math.max(bounds.zmin + half, Math.min(bounds.zmax - half, z));
+    const sx = (centerX - half - bounds.xmin) / (bounds.xmax - bounds.xmin) * this.radarBase.width;
+    const sy = (bounds.zmax - (centerZ + half)) / (bounds.zmax - bounds.zmin) * this.radarBase.height;
+    const sw = viewSpan / (bounds.xmax - bounds.xmin) * this.radarBase.width;
+    const sh = viewSpan / (bounds.zmax - bounds.zmin) * this.radarBase.height;
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(this.radarBase, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    const scale = c.width / viewSpan;
+    const screenX = (worldX: number) => c.width / 2 + (worldX - centerX) * scale;
+    const screenY = (worldZ: number) => c.height / 2 - (worldZ - centerZ) * scale;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, .2)';
+    ctx.lineWidth = 1;
+    for (const radius of [55, 110]) {
+      ctx.beginPath();
+      ctx.arc(screenX(x), screenY(z), radius * scale, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     if (staticOnly) return;
 
-    const px = (x + origin) * scale;
-    const pz = (z + origin) * scale;
+    for (const player of players) {
+      if (!(player.state & 1) || Math.hypot(player.x - x, player.z - z) < 0.5) continue;
+      const px = screenX(player.x), py = screenY(player.z);
+      if (px < 2 || px > c.width - 2 || py < 2 || py > c.height - 2) continue;
+      ctx.fillStyle = '#ef5350';
+      ctx.beginPath();
+      ctx.arc(px, py, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const px = screenX(x);
+    const pz = screenY(z);
 
     // Player Tactical Beacon & Heading Cone
     ctx.save();
     ctx.translate(px, pz);
-    ctx.rotate(-yaw);
+    ctx.rotate(Math.PI - yaw);
 
     // Direction cone
     ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
@@ -449,6 +472,7 @@ export class Hud {
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+    this.radarPosition.textContent = `X ${Math.round(x)} · Z ${Math.round(z)}`;
   }
 
   setHp(v: number) {

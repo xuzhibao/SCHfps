@@ -1,0 +1,329 @@
+{
+  "authority": "Mineways OBJ plus iron-block scope lines",
+  "coordinate_system": "X east/west, Y up, Z campus north/south; meters",
+  "mirrored": false,
+  "rotated_180": false,
+  "buildings": [
+    {
+      "name": "north_admin",
+      "status": "pass",
+      "direction": "unchanged axes; no mirror; no 90-degree rotation",
+      "transform": {
+        "scale": [
+          1.2137800448491727,
+          1.0,
+          1.2501664182569756
+        ],
+        "position": [
+          42.399983007079356,
+          3.0,
+          -55.88824632499785
+        ],
+        "rotation_y_degrees": 0.0,
+        "source_bounds": {
+          "x0": 96.88742,
+          "x1": 166.09271,
+          "z0": -241.65723,
+          "z1": -180.06543,
+          "y0": 0.0,
+          "y1": 25.392
+        },
+        "target_outer_bounds": {
+          "x0": 158.0,
+          "x1": 246.0,
+          "z0": -360.0,
+          "z1": -279.0,
+          "base_y": 3.0
+        },
+        "result_bounds": {
+          "x0": 160.0,
+          "x1": 244.0,
+          "z0": -358.0,
+          "z1": -281.0,
+          "y0": 3.0,
+          "y1": 28.392
+        },
+        "clearance": {
+          "west": 2.0,
+          "east": 2.0,
+          "south": 2.0,
+          "north": 2.0
+        }
+      }
+    },
+    {
+      "name": "activity_center",
+      "status": "pass",
+      "direction": "unchanged axes; no mirror; no 90-degree rotation",
+      "transform": {
+        "scale": [
+          0.86067811194241,
+          1.0,
+          1.1347660555893646
+        ],
+        "position": [
+          81.62699539776894,
+          3.0,
+          -76.6175909749132
+        ],
+        "rotation_y_degrees": 0.0,
+        "source_bounds": {
+          "x0": 91.0596,
+          "x1": 182.84769,
+          "z0": -84.05469,
+          "z1": 117.74902,
+          "y0": 0.0,
+          "y1": 24.6476
+        },
+        "target_outer_bounds": {
+          "x0": 158.0,
+          "x1": 241.0,
+          "z0": -174.0,
+          "z1": 59.0,
+          "base_y": 3.0
+        },
+        "result_bounds": {
+          "x0": 160.0,
+          "x1": 239.0,
+          "z0": -172.0,
+          "z1": 57.0,
+          "y0": 3.0,
+          "y1": 27.6476
+        },
+        "clearance": {
+          "west": 2.0,
+          "east": 2.0,
+          "south": 2.0,
+          "north": 2.0
+        }
+      }
+    },
+    {
+      "name": "stadium",
+      "status": "pass",
+      "direction": "unchanged axes; no mirror; no 90-degree rotation",
+      "transform": {
+        "scale": [
+          1.1830007699921363,
+          1.0,
+          1.4021600211966174
+        ],
+        "position": [
+          27.19512704870249,
+          3.0,
+          -46.958809844047664
+        ],
+        "rotation_y_degrees": 0.0,
+        "source_bounds": {
+          "x0": -165.0,
+          "x1": -30.59603,
+          "z0": 111.22754,
+          "z1": 269.55469,
+          "y0": 0.0,
+          "y1": 19.7635
+        },
+        "target_outer_bounds": {
+          "x0": -170.0,
+          "x1": -7.0,
+          "z0": 107.0,
+          "z1": 333.0,
+          "base_y": 3.0
+        },
+        "result_bounds": {
+          "x0": -168.0,
+          "x1": -9.0,
+          "z0": 109.0,
+          "z1": 331.0,
+          "y0": 3.0,
+          "y1": 22.7635
+        },
+        "clearance": {
+          "west": 2.0,
+          "east": 2.0,
+          "south": 2.0,
+          "north": 2.0
+        }
+      }
+    }
+  ],
+  "landmark_overlap_pairs": [],
+  "status": "pass",
+  "source_obj": {
+    "vertices": 911071,
+    "triangles": 929610
+  },
+  "mc_collision_boxes": 54131,
+  "landmark_collision_boxes": {
+    "north_admin": 5,
+    "activity_center": 30,
+    "stadium": 58
+  },
+  "total_collision_boxes": 54225,
+  "spawn_surface_min_max": [
+    3.0,
+    3.5
+  ],
+  "collision_generation": {
+    "mode": "thin surface shells; no roof-to-ground columns",
+    "surface_thickness": 0.12,
+    "vertical_cell": 0.5,
+    "platform_levels": 165,
+    "x_wall_planes": 668,
+    "z_wall_planes": 761,
+    "ignored_diagonal_faces": 88906,
+    "ignored_fractional_walls": 23937,
+    "surface_triangle_counts": {
+      "wall_x:stone": 96,
+      "wall_z:stone": 104,
+      "platform:stone": 98,
+      "platform:grass_block_top": 78,
+      "wall_x:grass_block_side": 94,
+      "wall_z:grass_block_side": 100,
+      "wall_z:dirt": 60,
+      "platform:dirt": 32,
+      "wall_x:dirt": 184,
+      "platform:cobblestone": 578,
+      "wall_z:cobblestone": 148,
+      "wall_x:oak_planks": 2308,
+      "wall_z:oak_planks": 2224,
+      "platform:oak_planks": 6678,
+      "wall_x:spruce_planks": 4812,
+      "wall_z:spruce_planks": 4340,
+      "platform:spruce_planks": 2948,
+      "wall_x:gravel": 26,
+      "wall_z:gravel": 12,
+      "platform:gravel": 10,
+      "wall_x:glass": 804,
+      "wall_z:glass": 802,
+      "platform:glass": 410,
+      "platform:sandstone_top": 14710,
+      "wall_x:sandstone": 3386,
+      "wall_z:sandstone": 3080,
+      "wall_x:chiseled_sandstone": 1508,
+      "wall_z:chiseled_sandstone": 1264,
+      "wall_x:cut_sandstone": 1468,
+      "wall_z:cut_sandstone": 1422,
+      "platform:MW_bed_feet_top": 8,
+      "platform:MW_bed_head_top": 14,
+      "wall_x:MW_bed_feet_end": 8,
+      "wall_z:MW_bed_feet_side": 16,
+      "wall_z:MW_bed_head_side": 28,
+      "wall_x:MW_bed_head_end": 14,
+      "wall_x:white_wool": 74,
+      "wall_z:white_wool": 74,
+      "platform:white_wool": 62,
+      "wall_x:light_blue_wool": 180,
+      "wall_z:light_blue_wool": 208,
+      "platform:light_blue_wool": 182,
+      "wall_x:yellow_wool": 12,
+      "wall_z:yellow_wool": 10,
+      "platform:yellow_wool": 6,
+      "wall_x:red_wool": 736,
+      "wall_z:red_wool": 814,
+      "platform:red_wool": 422,
+      "wall_z:gold_block": 546,
+      "wall_x:gold_block": 112,
+      "platform:gold_block": 60,
+      "platform:smooth_stone": 1554,
+      "wall_x:smooth_stone_slab_side": 9070,
+      "wall_z:smooth_stone_slab_side": 11622,
+      "wall_x:bricks": 728,
+      "wall_z:bricks": 670,
+      "platform:bricks": 92,
+      "platform:obsidian": 10,
+      "platform:MWO_redstone_dust_line0_off": 4,
+      "platform:redstone_dust_line0": 6,
+      "platform:MWO_redstone_dust_angled": 6,
+      "wall_z:redstone_dust_line0": 2,
+      "platform:MWO_redstone_dust_three_way": 2,
+      "platform:farmland_moist": 40,
+      "wall_z:nether_portal": 4,
+      "wall_x:nether_portal": 2,
+      "platform:nether_portal": 2,
+      "wall_x:white_stained_glass": 6,
+      "wall_z:white_stained_glass": 6,
+      "platform:white_stained_glass": 4,
+      "platform:orange_stained_glass": 88,
+      "wall_x:orange_stained_glass": 142,
+      "wall_z:orange_stained_glass": 134,
+      "wall_x:pink_stained_glass": 88,
+      "platform:pink_stained_glass": 46,
+      "wall_z:pink_stained_glass": 80,
+      "wall_x:stone_bricks": 1056,
+      "wall_z:stone_bricks": 168,
+      "platform:stone_bricks": 542,
+      "wall_x:mossy_stone_bricks": 132,
+      "wall_z:mossy_stone_bricks": 146,
+      "platform:mossy_stone_bricks": 66,
+      "wall_x:cracked_stone_bricks": 112,
+      "wall_z:cracked_stone_bricks": 110,
+      "platform:cracked_stone_bricks": 52,
+      "wall_x:chiseled_stone_bricks": 132,
+      "wall_z:chiseled_stone_bricks": 142,
+      "platform:chiseled_stone_bricks": 52,
+      "platform:lily_pad": 12,
+      "wall_x:quartz_pillar_top": 60,
+      "platform:quartz_pillar_top": 108,
+      "wall_x:quartz_pillar": 1260,
+      "wall_z:quartz_pillar": 1680,
+      "platform:quartz_pillar": 76,
+      "wall_x:quartz_block_side": 388,
+      "wall_z:quartz_block_side": 228,
+      "platform:quartz_block_top": 178,
+      "platform:chiseled_quartz_block_top": 1006,
+      "wall_z:chiseled_quartz_block": 11186,
+      "wall_x:chiseled_quartz_block": 11962,
+      "platform:white_terracotta": 1498,
+      "wall_z:white_terracotta": 13362,
+      "wall_x:white_terracotta": 3124,
+      "wall_x:light_gray_terracotta": 8,
+      "wall_z:light_gray_terracotta": 8,
+      "platform:light_gray_terracotta": 4,
+      "wall_x:prismarine": 60,
+      "wall_z:prismarine": 60,
+      "platform:prismarine": 48,
+      "wall_z:light_gray_wool": 316,
+      "wall_x:light_gray_wool": 304,
+      "platform:light_gray_wool": 94,
+      "wall_x:red_sandstone": 11846,
+      "wall_z:red_sandstone": 7448,
+      "platform:red_sandstone_top": 3322,
+      "wall_x:white_glazed_terracotta": 334,
+      "wall_z:white_glazed_terracotta": 318,
+      "wall_x:orange_glazed_terracotta": 688,
+      "wall_z:orange_glazed_terracotta": 1044,
+      "platform:orange_glazed_terracotta": 536,
+      "wall_x:yellow_glazed_terracotta": 16,
+      "wall_z:yellow_glazed_terracotta": 16,
+      "platform:yellow_glazed_terracotta": 8,
+      "wall_x:gray_glazed_terracotta": 914,
+      "wall_z:gray_glazed_terracotta": 656,
+      "platform:gray_glazed_terracotta": 466,
+      "wall_x:light_gray_glazed_terracotta": 8494,
+      "wall_z:light_gray_glazed_terracotta": 8958,
+      "platform:light_gray_glazed_terracotta": 612,
+      "wall_x:cyan_glazed_terracotta": 106,
+      "wall_z:cyan_glazed_terracotta": 94,
+      "platform:cyan_glazed_terracotta": 18,
+      "wall_x:purple_glazed_terracotta": 510,
+      "wall_z:purple_glazed_terracotta": 508,
+      "platform:purple_glazed_terracotta": 414,
+      "wall_z:black_glazed_terracotta": 356,
+      "platform:black_glazed_terracotta": 224,
+      "wall_x:black_glazed_terracotta": 462,
+      "wall_x:white_concrete_powder": 100,
+      "wall_z:white_concrete_powder": 100,
+      "platform:white_concrete_powder": 50,
+      "wall_x:bedrock": 1144,
+      "wall_z:bedrock": 1036,
+      "platform:bedrock": 312
+    }
+  },
+  "material_bundle": {
+    "material_count": 194,
+    "map_Kd_references": 194,
+    "unique_textures": 194,
+    "missing_textures": [],
+    "status": "pass"
+  }
+}

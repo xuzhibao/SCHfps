@@ -23,8 +23,13 @@ type World struct {
 	Blocks   []MapBlock   `json:"blocks"`
 	Spawns   [][3]float64 `json:"spawns"`
 
-	aabbs []AABB
+	aabbs  []AABB
+	spatial map[gridKey][]int
 }
+
+type gridKey struct{ X, Z int }
+
+const spatialCell = 16.0
 
 type MapBlock struct {
 	X, Y, Z float64
@@ -51,6 +56,7 @@ func LoadWorld(path string) (*World, error) {
 			Max: Vec3{b.X + b.W, b.Y + b.H, b.Z + b.D},
 		})
 	}
+	w.buildSpatialIndex()
 	w.rawJSON = data
 	hash := sha256.Sum256(data)
 	w.Revision = binary.LittleEndian.Uint32(hash[:4])
@@ -58,6 +64,45 @@ func LoadWorld(path string) (*World, error) {
 		return nil, fmt.Errorf("map has no spawns")
 	}
 	return w, nil
+}
+
+func spatialCoord(value float64) int { return int(math.Floor(value / spatialCell)) }
+
+func (w *World) buildSpatialIndex() {
+	w.spatial = make(map[gridKey][]int)
+	for index, box := range w.aabbs {
+		x0, x1 := spatialCoord(box.Min.X), spatialCoord(box.Max.X-Epsilon)
+		z0, z1 := spatialCoord(box.Min.Z), spatialCoord(box.Max.Z-Epsilon)
+		for x := x0; x <= x1; x++ {
+			for z := z0; z <= z1; z++ {
+				key := gridKey{x, z}
+				w.spatial[key] = append(w.spatial[key], index)
+			}
+		}
+	}
+}
+
+func (w *World) nearby(minX, maxX, minZ, maxZ float64) []AABB {
+	// Unit tests and small synthetic worlds may be constructed directly instead
+	// of through LoadWorld. Keep that path correct while production worlds use
+	// the spatial broad phase.
+	if w.spatial == nil {
+		return w.aabbs
+	}
+	seen := make(map[int]struct{})
+	result := make([]AABB, 0, 64)
+	for x := spatialCoord(minX); x <= spatialCoord(maxX); x++ {
+		for z := spatialCoord(minZ); z <= spatialCoord(maxZ); z++ {
+			for _, index := range w.spatial[gridKey{x, z}] {
+				if _, ok := seen[index]; ok {
+					continue
+				}
+				seen[index] = struct{}{}
+				result = append(result, w.aabbs[index])
+			}
+		}
+	}
+	return result
 }
 
 const (
@@ -69,11 +114,14 @@ const (
 // MoveAABB uses swept axis tests so frame stalls and corrections cannot cross walls.
 func (w *World) MoveAABB(pos *Vec3, vel *Vec3, dt, height float64, canStep bool) bool {
 	grounded := w.depenetrate(pos, vel, height)
+	reachX := math.Abs(vel.X*dt) + PlayerHalf + 1
+	reachZ := math.Abs(vel.Z*dt) + PlayerHalf + 1
+	candidates := w.nearby(pos.X-reachX, pos.X+reachX, pos.Z-reachZ, pos.Z+reachZ)
 
 	dx := vel.X * dt
 	if dx != 0 {
 		startX, nextX, blocked := pos.X, pos.X+dx, false
-		for _, b := range w.aabbs {
+		for _, b := range candidates {
 			if pos.Y >= b.Max.Y || pos.Y+height <= b.Min.Y || pos.Z-PlayerHalf >= b.Max.Z || pos.Z+PlayerHalf <= b.Min.Z {
 				continue
 			}
@@ -104,7 +152,7 @@ func (w *World) MoveAABB(pos *Vec3, vel *Vec3, dt, height float64, canStep bool)
 	dz := vel.Z * dt
 	if dz != 0 {
 		startZ, nextZ, blocked := pos.Z, pos.Z+dz, false
-		for _, b := range w.aabbs {
+		for _, b := range candidates {
 			if pos.Y >= b.Max.Y || pos.Y+height <= b.Min.Y || pos.X-PlayerHalf >= b.Max.X || pos.X+PlayerHalf <= b.Min.X {
 				continue
 			}
@@ -135,7 +183,7 @@ func (w *World) MoveAABB(pos *Vec3, vel *Vec3, dt, height float64, canStep bool)
 	dy := vel.Y * dt
 	if dy != 0 {
 		startY, nextY := pos.Y, pos.Y+dy
-		for _, b := range w.aabbs {
+		for _, b := range candidates {
 			if pos.X-PlayerHalf >= b.Max.X || pos.X+PlayerHalf <= b.Min.X || pos.Z-PlayerHalf >= b.Max.Z || pos.Z+PlayerHalf <= b.Min.Z {
 				continue
 			}
@@ -155,7 +203,7 @@ func (w *World) MoveAABB(pos *Vec3, vel *Vec3, dt, height float64, canStep bool)
 
 func (w *World) CanOccupy(pos Vec3, height float64) bool {
 	box := playerBox(pos, height)
-	for _, b := range w.aabbs {
+	for _, b := range w.nearby(box.Min.X, box.Max.X, box.Min.Z, box.Max.Z) {
 		if intersects(box, b) {
 			return false
 		}
@@ -167,7 +215,8 @@ func (w *World) depenetrate(pos *Vec3, vel *Vec3, height float64) bool {
 	grounded := false
 	for pass := 0; pass < 6; pass++ {
 		found := false
-		for _, b := range w.aabbs {
+		box := playerBox(*pos, height)
+		for _, b := range w.nearby(box.Min.X, box.Max.X, box.Min.Z, box.Max.Z) {
 			if !intersects(playerBox(*pos, height), b) {
 				continue
 			}
@@ -207,7 +256,7 @@ func (w *World) depenetrate(pos *Vec3, vel *Vec3, height float64) bool {
 
 func stepBlocked(w *World, p Vec3, newFeet, height float64) bool {
 	top := playerBox(Vec3{p.X, newFeet + Epsilon, p.Z}, height)
-	for _, b := range w.aabbs {
+	for _, b := range w.nearby(top.Min.X, top.Max.X, top.Min.Z, top.Max.Z) {
 		if intersects(top, b) {
 			return true
 		}
@@ -228,14 +277,70 @@ func intersects(a, b AABB) bool {
 		a.Min.Z < b.Max.Z && a.Max.Z > b.Min.Z
 }
 
-// Raycast returns distance to nearest world hit via slab method, O(n).
+// Raycast returns distance to the nearest world hit. Production maps traverse
+// only the occupied 16 m cells; directly constructed test worlds fall back to
+// the complete AABB list.
 func (w *World) Raycast(origin, dir Vec3, maxDist float64) (bool, float64) {
 	best := maxDist
 	hit := false
-	for _, b := range w.aabbs {
-		if d, ok := rayAABB(origin, dir, b, best); ok && d < best {
-			best = d
-			hit = true
+	if w.spatial == nil {
+		for _, box := range w.aabbs {
+			if distance, ok := rayAABB(origin, dir, box, best); ok && distance < best {
+				best, hit = distance, true
+			}
+		}
+		return hit, best
+	}
+	seen := make(map[int]struct{})
+	testCell := func(key gridKey) {
+		for _, index := range w.spatial[key] {
+			if _, ok := seen[index]; ok {
+				continue
+			}
+			seen[index] = struct{}{}
+			if distance, ok := rayAABB(origin, dir, w.aabbs[index], best); ok && distance < best {
+				best, hit = distance, true
+			}
+		}
+	}
+	horizontal := math.Hypot(dir.X, dir.Z)
+	if horizontal < 1e-9 {
+		testCell(gridKey{spatialCoord(origin.X), spatialCoord(origin.Z)})
+		return hit, best
+	}
+	cx, cz := spatialCoord(origin.X), spatialCoord(origin.Z)
+	stepX, stepZ := int(math.Copysign(1, dir.X)), int(math.Copysign(1, dir.Z))
+	deltaX, deltaZ := math.Inf(1), math.Inf(1)
+	nextX, nextZ := math.Inf(1), math.Inf(1)
+	if math.Abs(dir.X) > 1e-9 {
+		deltaX = spatialCell / math.Abs(dir.X)
+		boundary := float64(cx) * spatialCell
+		if dir.X > 0 {
+			boundary = float64(cx+1) * spatialCell
+		}
+		nextX = (boundary - origin.X) / dir.X
+	}
+	if math.Abs(dir.Z) > 1e-9 {
+		deltaZ = spatialCell / math.Abs(dir.Z)
+		boundary := float64(cz) * spatialCell
+		if dir.Z > 0 {
+			boundary = float64(cz+1) * spatialCell
+		}
+		nextZ = (boundary - origin.Z) / dir.Z
+	}
+	for travel := 0.0; travel <= best; {
+		testCell(gridKey{cx, cz})
+		if nextX < nextZ {
+			travel = nextX
+			nextX += deltaX
+			cx += stepX
+		} else {
+			travel = nextZ
+			nextZ += deltaZ
+			cz += stepZ
+		}
+		if travel > maxDist {
+			break
 		}
 	}
 	return hit, best

@@ -11,13 +11,13 @@ import bundledMap from '../../map.json';
 
 const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = import.meta.env.VITE_WS_URL || `${proto}//${location.host}/ws`;
-const mapSize = (bundledMap as MapData).size;
+const mapSize = (bundledMap as unknown as MapData).size;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x78939d);
-scene.fog = new THREE.Fog(0x8ea5a8, 52, 265);
+scene.fog = new THREE.Fog(0x8ea5a8, 150, 820);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 450);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 1300);
 camera.rotation.order = 'YXZ';
 camera.layers.enable(0);
 camera.layers.disable(1);
@@ -583,7 +583,7 @@ net.onWelcome = (id, _revision) => {
   joined = true;
   hud.hideDisconnect();
   if (!world) {
-    const map = bundledMap as MapData;
+    const map = bundledMap as unknown as MapData;
     world = new WorldView(scene, map);
     world.clouds.visible = hud.quality !== 'low';
     hud.setMap(map);
@@ -633,7 +633,7 @@ net.onSnapshot = (_tick, _ack, updates) => {
         weapons.group.visible = false;
       }
       const beforeX = local.pos.x, beforeY = local.pos.y, beforeZ = local.pos.z;
-      local.reconcile(p.x, p.y, p.z, p.vx, p.vz, latencyMs, world?.boxes, !!(p.state & 8));
+      local.reconcile(p.x, p.y, p.z, p.vx, p.vz, latencyMs, world?.queryBoxes(p.x, p.z, 4), !!(p.state & 8));
       cameraCorrection.x += beforeX - local.pos.x;
       cameraCorrection.y += beforeY - local.pos.y;
       cameraCorrection.z += beforeZ - local.pos.z;
@@ -895,11 +895,12 @@ function frame(t: number) {
       const step = Math.min(1 / 60, remaining);
       const wasGrounded = local.onGround;
       const feetY = local.pos.y;
-      const canStand = !local.crouch || !!(local.keys & KEY.Crouch) || !world || canOccupy(world.boxes, local.pos, PHYS.standingHeight);
+      const nearbyBoxes = world?.queryBoxes(local.pos.x, local.pos.z, 4) ?? [];
+      const canStand = !local.crouch || !!(local.keys & KEY.Crouch) || !world || canOccupy(nearbyBoxes, local.pos, PHYS.standingHeight);
       local.update(step, canStand);
       const fallSpeed = local.vel.y;
       let grounded = false;
-      if (world) grounded = moveAABB(local.pos, local.vel, step, world.boxes, local.height(), local.onGround);
+      if (world) grounded = moveAABB(local.pos, local.vel, step, nearbyBoxes, local.height(), local.onGround);
       else local.pos.addScaledVector(local.vel, step);
       if (local.flying) {
         const halfX = mapSize[0] / 2 - 0.3;
@@ -997,7 +998,7 @@ function frame(t: number) {
     mouseX = 0;
     mouseY = 0;
 
-    hud.updateRadar(local.pos.x, local.pos.z, local.yaw, t);
+    hud.updateRadar(local.pos.x, local.pos.z, local.yaw, t, states.values());
     const localReloading = weapons.isReloading(t);
     const reloadPending = reloadPendingSlot === activeSlot;
     hud.setReloading(activeSlot <= 2 && (localReloading || reloadPending), localReloading ? weapons.getReloadProgress(t) : 1);

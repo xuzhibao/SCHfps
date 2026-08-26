@@ -33,6 +33,7 @@ export interface MapBlock {
 
 export interface MapData {
   size: [number, number];
+  origin?: [number, number];
   blocks: MapBlock[];
   spawns: [number, number, number][];
 }

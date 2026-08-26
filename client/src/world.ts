@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { MapData } from './constants.js';
 
 export type Box = { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number };
@@ -8,40 +10,162 @@ export type Box = { x0: number; x1: number; y0: number; y1: number; z0: number; 
  * PixelStrike world adapter for the SJZU campus.
  *
  * The original project generates a voxel scene from map.json. The campus uses
- * the same AABB map contract for movement and server hit validation, while the
- * visible scene comes from the verified v007 GLB. The exporter already writes
- * the campus mesh in Three.js/PixelStrike's Y-up convention, so it must be
- * loaded without another scene rotation.
+ * the same AABB map contract for movement and server hit validation. The new
+ * authoritative visual base is the user's Mineways OBJ/MTL/tex export. Only
+ * the three unfinished landmarks are taken from the earlier v007 GLB and are
+ * transformed into the iron-block scope lines measured from the MC world.
  */
 export class WorldView {
   group = new THREE.Group();
   clouds = new THREE.Group();
   sun = new THREE.Group();
   boxes: Box[] = [];
+  private spatial = new Map<string, Box[]>();
+  private readonly spatialCell = 16;
   private pickups = new Map<number, THREE.Group>();
   private pickupTemplates: THREE.Group[];
 
   constructor(scene: THREE.Scene, map: MapData) {
     this.pickupTemplates = [this.createPickup(0), this.createPickup(1), this.createPickup(2)];
     for (const b of map.blocks) {
-      if (b.t !== 12) this.boxes.push({ x0: b.x, x1: b.x + b.w, y0: b.y, y1: b.y + b.h, z0: b.z, z1: b.z + b.d });
+      if (b.t !== 12) {
+        const box = { x0: b.x, x1: b.x + b.w, y0: b.y, y1: b.y + b.h, z0: b.z, z1: b.z + b.d };
+        this.boxes.push(box);
+        this.indexBox(box);
+      }
     }
     scene.add(this.group, this.clouds, this.sun);
     this.setupLighting();
-    new GLTFLoader().load('/assets/SJZU_Campus_Master_v007_Textured.glb', (gltf) => {
-      const campus = gltf.scene;
-      campus.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
+    this.loadMinecraftCampus();
+    this.loadReservedLandmarks();
+  }
+
+  private spatialKey(x: number, z: number) { return `${x},${z}`; }
+
+  private indexBox(box: Box) {
+    const x0 = Math.floor(box.x0 / this.spatialCell);
+    const x1 = Math.floor((box.x1 - 1e-6) / this.spatialCell);
+    const z0 = Math.floor(box.z0 / this.spatialCell);
+    const z1 = Math.floor((box.z1 - 1e-6) / this.spatialCell);
+    for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+      const key = this.spatialKey(x, z);
+      const cell = this.spatial.get(key);
+      if (cell) cell.push(box);
+      else this.spatial.set(key, [box]);
+    }
+  }
+
+  queryBoxes(x: number, z: number, radius = 2.5) {
+    const x0 = Math.floor((x - radius) / this.spatialCell);
+    const x1 = Math.floor((x + radius) / this.spatialCell);
+    const z0 = Math.floor((z - radius) / this.spatialCell);
+    const z1 = Math.floor((z + radius) / this.spatialCell);
+    const result: Box[] = [];
+    const seen = new Set<Box>();
+    for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) {
+      for (const box of this.spatial.get(this.spatialKey(cx, cz)) ?? []) {
+        if (seen.has(box)) continue;
+        seen.add(box);
+        result.push(box);
+      }
+    }
+    return result;
+  }
+
+  private loadMinecraftCampus() {
+    const base = `${import.meta.env.BASE_URL}assets/mcmap/`;
+    const mtlLoader = new MTLLoader().setPath(base).setResourcePath(base);
+    mtlLoader.load('mcmap.mtl', (materials) => {
+      materials.preload();
+      new OBJLoader().setMaterials(materials).setPath(base).load('campus_mc.obj', (campus) => {
+        campus.name = 'SJZU_MC_AUTHORITATIVE_BASE';
+        let meshCount = 0;
+        let triangleCount = 0;
+        campus.traverse((obj) => {
+          if (!(obj instanceof THREE.Mesh)) return;
+          meshCount++;
+          triangleCount += obj.geometry.index ? obj.geometry.index.count / 3 : obj.geometry.attributes.position.count / 3;
           obj.frustumCulled = true;
           obj.castShadow = false;
           obj.receiveShadow = true;
+          const list = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (const raw of list) {
+            const material = raw as THREE.MeshPhongMaterial;
+            if (material.map) {
+              material.map.colorSpace = THREE.SRGBColorSpace;
+              material.map.magFilter = THREE.NearestFilter;
+              material.map.minFilter = THREE.NearestMipmapLinearFilter;
+              material.map.generateMipmaps = true;
+              material.map.needsUpdate = true;
+            }
+            material.side = material.transparent ? THREE.DoubleSide : THREE.FrontSide;
+            material.needsUpdate = true;
+          }
+        });
+        this.group.add(campus);
+        console.info(`[SJZU] MC base loaded: ${meshCount} meshes, ${Math.round(triangleCount)} triangles`);
+      }, (event) => {
+        if (event.total > 0) console.info(`[SJZU] MC base ${Math.round(event.loaded / event.total * 100)}%`);
+      }, (error) => console.error('[SJZU] authoritative MC OBJ failed to load', error));
+    }, undefined, (error) => console.error('[SJZU] Mineways MTL failed to load', error));
+  }
+
+  private loadReservedLandmarks() {
+    const placements = {
+      north_admin: {
+        scale: [1.2137800448491727, 1, 1.2501664182569756],
+        position: [42.399983007079356, 3, -55.88824632499785],
+        target: [158, 246, -360, -279],
+      },
+      activity_center: {
+        scale: [0.86067811194241, 1, 1.1347660555893646],
+        position: [81.62699539776894, 3, -76.6175909749132],
+        target: [158, 241, -174, 59],
+      },
+      stadium: {
+        scale: [1.1830007699921363, 1, 1.4021600211966174],
+        position: [27.19512704870249, 3, -46.958809844047664],
+        target: [-170, -7, 107, 333],
+      },
+    } as const;
+    new GLTFLoader().load(`${import.meta.env.BASE_URL}assets/SJZU_Campus_Master_v007_Textured.glb`, (gltf) => {
+      gltf.scene.updateMatrixWorld(true);
+      const landmarkRoot = new THREE.Group();
+      landmarkRoot.name = 'SJZU_RESERVED_LANDMARKS';
+      for (const [name, placement] of Object.entries(placements)) {
+        const selected: THREE.Object3D[] = [];
+        gltf.scene.traverse((obj) => {
+          if (!obj.name.startsWith(`${name}__`)) return;
+          if (obj.parent && obj.parent.name.startsWith(`${name}__`)) return;
+          selected.push(obj);
+        });
+        const building = new THREE.Group();
+        building.name = `MC_PLACED__${name}`;
+        for (const obj of selected) {
+          const worldMatrix = obj.matrixWorld.clone();
+          building.add(obj);
+          worldMatrix.decompose(obj.position, obj.quaternion, obj.scale);
         }
+        building.scale.set(placement.scale[0], placement.scale[1], placement.scale[2]);
+        building.position.set(placement.position[0], placement.position[1], placement.position[2]);
+        landmarkRoot.add(building);
+        building.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(building);
+        const [x0, x1, z0, z1] = placement.target;
+        const inside = bounds.min.x >= x0 - 0.01 && bounds.max.x <= x1 + 0.01 && bounds.min.z >= z0 - 0.01 && bounds.max.z <= z1 + 0.01;
+        console.info(`[SJZU] ${name} placed ${inside ? 'inside' : 'OUTSIDE'} MC scope`, bounds.min.toArray(), bounds.max.toArray());
+      }
+      landmarkRoot.traverse((obj) => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        obj.frustumCulled = true;
+        obj.castShadow = false;
+        obj.receiveShadow = true;
       });
-      this.group.add(campus);
+      this.group.add(landmarkRoot);
       const atlasUrl = `${import.meta.env.BASE_URL}assets/SJZU_Campus_Material_Atlas_v001.png`;
       new THREE.TextureLoader().load(atlasUrl, (atlas) => {
         atlas.colorSpace = THREE.SRGBColorSpace;
-        this.applyMaterialAtlas(campus, atlas);
+        this.applyMaterialAtlas(landmarkRoot, atlas);
       }, undefined, (error) => console.error(`[SJZU] material atlas failed to load: ${atlasUrl}`, error));
     }, undefined, (error) => console.error('[SJZU] campus GLB failed to load', error));
   }
@@ -58,10 +182,13 @@ export class WorldView {
     };
     const inset = 0.006;
     let mapped = 0;
+    const seen = new Set<THREE.Material>();
     campus.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh)) return;
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
       for (const raw of materials) {
+        if (seen.has(raw)) continue;
+        seen.add(raw);
         const material = raw as THREE.MeshStandardMaterial;
         let key = (material.name || '').toLowerCase();
         if (!tiles[key]) {
@@ -99,7 +226,7 @@ export class WorldView {
 
   private setupLighting() {
     const sky = new THREE.Mesh(
-      new THREE.SphereGeometry(600, 24, 12),
+      new THREE.SphereGeometry(1250, 24, 12),
       new THREE.MeshBasicMaterial({ color: 0x7f9ba5, side: THREE.BackSide, fog: false }),
     );
     this.group.add(sky);
@@ -108,7 +235,7 @@ export class WorldView {
       const cloud = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), cloudMat);
       const a = i / 16 * Math.PI * 2;
       cloud.scale.set(16 + (i % 4) * 5, 3, 10 + (i % 3) * 4);
-      cloud.position.set(Math.cos(a) * 210, 58 + (i % 3) * 5, Math.sin(a) * 210);
+      cloud.position.set(Math.cos(a) * 480, 74 + (i % 3) * 7, Math.sin(a) * 480);
       this.clouds.add(cloud);
     }
   }
@@ -141,7 +268,42 @@ export class WorldView {
 
   raycastDistance(origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number) {
     let best = maxDist;
-    for (const b of this.boxes) {
+    const candidates: Box[] = [];
+    const seen = new Set<Box>();
+    const horizontal = Math.hypot(dir.x, dir.z);
+    if (horizontal < 1e-8) {
+      for (const box of this.queryBoxes(origin.x, origin.z, 0.5)) { seen.add(box); candidates.push(box); }
+    } else {
+      let cx = Math.floor(origin.x / this.spatialCell);
+      let cz = Math.floor(origin.z / this.spatialCell);
+      const stepX = Math.sign(dir.x);
+      const stepZ = Math.sign(dir.z);
+      const deltaX = Math.abs(dir.x) < 1e-9 ? Infinity : this.spatialCell / Math.abs(dir.x);
+      const deltaZ = Math.abs(dir.z) < 1e-9 ? Infinity : this.spatialCell / Math.abs(dir.z);
+      const boundaryX = stepX > 0 ? (cx + 1) * this.spatialCell : cx * this.spatialCell;
+      const boundaryZ = stepZ > 0 ? (cz + 1) * this.spatialCell : cz * this.spatialCell;
+      let nextX = Math.abs(dir.x) < 1e-9 ? Infinity : (boundaryX - origin.x) / dir.x;
+      let nextZ = Math.abs(dir.z) < 1e-9 ? Infinity : (boundaryZ - origin.z) / dir.z;
+      let travel = 0;
+      while (travel <= best) {
+        for (const box of this.spatial.get(this.spatialKey(cx, cz)) ?? []) {
+          if (seen.has(box)) continue;
+          seen.add(box);
+          candidates.push(box);
+        }
+        if (nextX < nextZ) {
+          travel = nextX;
+          nextX += deltaX;
+          cx += stepX;
+        } else {
+          travel = nextZ;
+          nextZ += deltaZ;
+          cz += stepZ;
+        }
+        if (!Number.isFinite(travel) || travel > maxDist) break;
+      }
+    }
+    for (const b of candidates) {
       let tmin = 0; let tmax = best;
       const axis = (o: number, d: number, lo: number, hi: number) => {
         if (Math.abs(d) < 1e-9) return o >= lo && o <= hi;
